@@ -23,6 +23,17 @@ import {
 import { CalendarDays } from "lucide-react";
 import dayjs from "dayjs";
 
+import {
+    LineChart,
+    Line,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ResponsiveContainer,
+} from "recharts";
+
 export default function DashboardPage() {
     const [coins, setCoins] = useState(0);
     const [date, setDate] = useState(new Date());
@@ -31,6 +42,7 @@ export default function DashboardPage() {
         total_calories_out: 0,
         net_calories: 0,
     });
+    const [weeklyData, setWeeklyData] = useState([]);
     const [logs, setLogs] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [motivation, setMotivation] = useState("");
@@ -77,6 +89,14 @@ export default function DashboardPage() {
                 .single();
 
             if (stats) setCoins(stats.total_coins);
+
+            const { data: weeklyData } = await supabase.rpc(
+                "get_weekly_summary",
+                {
+                    p_user_id: user.id,
+                }
+            );
+            setWeeklyData(weeklyData || []);
 
             const motivation = await getMotivationMessage(
                 summaryData[0].net_calories
@@ -321,6 +341,46 @@ export default function DashboardPage() {
                                 </div>
                             ))}
                         </div>
+                    )}
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <CardTitle>Tren Kalori Mingguan</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {weeklyData.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={300}>
+                            <LineChart data={weeklyData}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="log_date" />
+                                <YAxis />
+                                <Tooltip />
+                                <Legend />
+                                <Line
+                                    type="monotone"
+                                    dataKey="total_in"
+                                    stroke="#82ca9d"
+                                    name="Kalori Masuk"
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="total_out"
+                                    stroke="#8884d8"
+                                    name="Kalori Terbakar"
+                                />
+                                <Line
+                                    type="monotone"
+                                    dataKey="net_calories"
+                                    stroke="#ff7300"
+                                    name="Kalori Bersih"
+                                />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <p className="text-gray-500">
+                            Belum ada data minggu ini.
+                        </p>
                     )}
                 </CardContent>
             </Card>
