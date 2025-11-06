@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/lib/supabaseClient";
 
 /**
- * Modal untuk log aktivitas (Tahap 2)
+ * Modal for logging activities (Stage 2).
  */
 export default function LogActivityModal({ onClose }: { onClose: () => void }) {
     const [activities, setActivities] = useState<any[]>([]);
@@ -24,7 +24,7 @@ export default function LogActivityModal({ onClose }: { onClose: () => void }) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
-    // 📦 Ambil daftar aktivitas dari tabel met_activities
+    // Fetches the list of available activities from the database on component mount.
     useEffect(() => {
         const fetchActivities = async () => {
             setLoading(true);
@@ -43,7 +43,7 @@ export default function LogActivityModal({ onClose }: { onClose: () => void }) {
         a.activity_name.toLowerCase().includes(search.toLowerCase())
     );
 
-    // 💾 Simpan ke activity_logs
+    // Handles saving the new activity log to the database.
     const handleSave = async () => {
         if (!selectedActivity || !duration) return;
         setSaving(true);
@@ -86,7 +86,7 @@ export default function LogActivityModal({ onClose }: { onClose: () => void }) {
                     <DialogTitle>🏃 Log Aktivitas</DialogTitle>
                 </DialogHeader>
 
-                {/* Search bar */}
+                {/* Activity Search Section */}
                 {!selectedActivity && (
                     <>
                         <div className="flex gap-2 mt-2">
@@ -130,7 +130,7 @@ export default function LogActivityModal({ onClose }: { onClose: () => void }) {
                     </>
                 )}
 
-                {/* Form input setelah memilih aktivitas */}
+                {/* Activity Details Form: Shown after an activity is selected. */}
                 {selectedActivity && (
                     <div className="mt-4 space-y-3">
                         <h3 className="font-semibold">

@@ -221,7 +221,7 @@ export default function DashboardPage() {
                 </Popover>
             </div>
 
-            {/* Ringkasan Kalori */}
+            {/* Calorie Summary: Displays intake, expenditure, and net calories for the day. */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>
                     <CardHeader>
@@ -257,7 +257,7 @@ export default function DashboardPage() {
                 </Card>
             </div>
 
-            {/* Tabel Log */}
+            {/* Log Table: Displays food and activity logs for the selected day. */}
             <Card>
                 <CardHeader>
                     <CardTitle>Log Hari Ini</CardTitle>

@@ -19,7 +19,7 @@ export async function GET(req: Request) {
 
         const data = await res.json();
 
-        // mapping hasil ke struktur sederhana
+        // Maps the raw food data from the API to a simplified structure for the client.
         const foods =
             data.foods?.map((item: any) => ({
                 name: item.description,

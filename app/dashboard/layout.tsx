@@ -1,4 +1,7 @@
-// app/dashboard/layout.tsx
+/**
+ * Provides the shared layout structure for all dashboard pages.
+ * This includes the main navigation bar and the content area for nested routes.
+ */
 import React from "react";
 import Navbar from "@/components/shared/Navbar";
 

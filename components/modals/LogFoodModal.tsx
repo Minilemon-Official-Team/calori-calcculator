@@ -13,19 +13,19 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/lib/supabaseClient";
 
 /**
- * Modal untuk log makanan (Tahap 1)
+ * Modal for logging food entries (Stage 1).
  */
 export default function LogFoodModal({ onClose }: { onClose: () => void }) {
     const [query, setQuery] = useState("");
     const [results, setResults] = useState<any[]>([]);
     const [selectedFood, setSelectedFood] = useState<any | null>(null);
-    // store as string to allow free typing (e.g. starting with '.', deleting digits, etc.)
+    // Store as a string to allow free typing (e.g., starting with '.', deleting digits, etc.).
     const [quantity, setQuantity] = useState("1");
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
-    // 🔍 Pencarian ke /api/food-search
+    // Handles the food search by calling the internal API endpoint.
     const handleSearch = async () => {
         setLoading(true);
         setError("");
@@ -35,7 +35,7 @@ export default function LogFoodModal({ onClose }: { onClose: () => void }) {
             );
             if (!res.ok) throw new Error("Gagal mengambil data dari USDA API");
             const data = await res.json();
-            // data langsung array hasil dari route
+            // The API response is expected to be a direct JSON array of food items.
             setResults(data);
         } catch (err: unknown) {
             const message =
@@ -50,7 +50,7 @@ export default function LogFoodModal({ onClose }: { onClose: () => void }) {
         }
     };
 
-    // 💾 Simpan ke Supabase
+    // Saves the new food log to the database via an RPC call.
     const handleSave = async () => {
         if (!selectedFood) return;
         setSaving(true);
@@ -65,7 +65,7 @@ export default function LogFoodModal({ onClose }: { onClose: () => void }) {
         }
 
         try {
-            // validate quantity before sending
+            // Validate serving quantity before proceeding.
             const qtyNum = Number(quantity);
             if (Number.isNaN(qtyNum) || qtyNum <= 0) {
                 setError("Jumlah porsi tidak valid");
@@ -77,9 +77,8 @@ export default function LogFoodModal({ onClose }: { onClose: () => void }) {
                 {
                     p_user_id: user.id,
                     p_food_name: selectedFood.name,
-                    // pass a number for calories (not a string with ::integer cast)
+                    // Ensure calories and quantity are passed as numbers to the RPC function.
                     p_calories_kcal: Math.round(Number(selectedFood.calories)),
-                    // ensure quantity is a number
                     p_serving_qty: qtyNum,
                     p_serving_unit: selectedFood.unit || "portion",
                 }
@@ -112,7 +111,7 @@ export default function LogFoodModal({ onClose }: { onClose: () => void }) {
                     <DialogTitle>🍽️ Log Entri Makanan</DialogTitle>
                 </DialogHeader>
 
-                {/* Search bar */}
+                {/* Food Search Input */}
                 <div className="flex gap-2 mt-2">
                     <Input
                         value={query}
@@ -126,7 +125,7 @@ export default function LogFoodModal({ onClose }: { onClose: () => void }) {
 
                 {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
 
-                {/* Hasil pencarian */}
+                {/* Search Results List */}
                 {!selectedFood && (
                     <ScrollArea className="max-h-64 mt-4 border rounded-md">
                         {results.length > 0 ? (
@@ -150,7 +149,7 @@ export default function LogFoodModal({ onClose }: { onClose: () => void }) {
                     </ScrollArea>
                 )}
 
-                {/* Form setelah makanan dipilih */}
+                {/* Quantity Form: Shown after a food is selected. */}
                 {selectedFood && (
                     <div className="mt-4 space-y-3">
                         <h3 className="font-semibold">
@@ -161,7 +160,7 @@ export default function LogFoodModal({ onClose }: { onClose: () => void }) {
                             step="0.1"
                             min="0.1"
                             value={quantity}
-                            // keep raw input string so user can type freely
+                            // Keep the raw input string so the user can type freely.
                             onChange={(e) => setQuantity(e.target.value)}
                             placeholder="Jumlah porsi"
                         />

@@ -34,7 +34,7 @@ export default function RegisterPage() {
         setLoading(true);
         setError("");
 
-        // Signup ke Supabase Auth
+        // Sign up with Supabase Auth
         const { data, error } = await supabase.auth.signUp({
             email: email.trim().toLowerCase(),
             password: password.trim(),
@@ -50,9 +50,9 @@ export default function RegisterPage() {
             return;
         }
 
-        // Jika berhasil signup dan user tersedia
+        // If signup is successful and user is available
         if (data.user) {
-            // Buat row baru di tabel profiles secara manual
+            // Manually create a new row in the profiles table
             const { error: profileError } = await supabase
                 .from("profiles")
                 .insert({
@@ -68,7 +68,7 @@ export default function RegisterPage() {
                 return;
             }
 
-            // Redirect ke halaman login
+            // Redirect to the login page
             router.push("/auth/login");
         }
 

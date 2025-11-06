@@ -25,7 +25,7 @@ export default function Navbar() {
             const user = auth.user;
             if (!user) return;
 
-            // Ambil inisial dari nama lengkap atau email
+            // Generates user initials from full name or email for the avatar fallback.
             const fullName =
                 (user.user_metadata?.full_name as string | undefined) ?? "";
             const init =
@@ -46,12 +46,12 @@ export default function Navbar() {
 
     return (
         <nav className="flex items-center justify-between px-6 py-4 border-b bg-white">
-            {/* Logo */}
+            {/* Logo / Link to Dashboard */}
             <Link href="/dashboard" className="font-bold text-xl text-primary">
                 CalPal
             </Link>
 
-            {/* Avatar + dropdown menu */}
+            {/* User Avatar and Dropdown Menu */}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <button className="rounded-full outline-none ring-0">
@@ -66,7 +66,7 @@ export default function Navbar() {
                     <DropdownMenuLabel>Account</DropdownMenuLabel>
                     <DropdownMenuSeparator />
 
-                    {/* Arahkan ke setup profile */}
+                    {/* Profile link */}
                     <DropdownMenuItem
                         onClick={() => router.push("/setup-profile")}
                         className="cursor-pointer"

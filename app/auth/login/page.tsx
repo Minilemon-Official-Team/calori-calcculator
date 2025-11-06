@@ -28,7 +28,7 @@ export default function LoginPage() {
         setLoading(true);
         setError("");
 
-        // 🔹 Step 1: Login ke Supabase
+        // Step 1: Log in to Supabase
         const { data, error } = await supabase.auth.signInWithPassword({
             email: email.trim().toLowerCase(),
             password: password.trim(),
@@ -46,7 +46,7 @@ export default function LoginPage() {
             return;
         }
 
-        // 🔹 Step 2: Ambil profil user berdasarkan id Supabase Auth
+        // Step 2: Fetch user profile based on Supabase Auth ID
         const userId = data.user?.id;
         if (!userId) {
             setError("User ID tidak ditemukan.");
@@ -66,12 +66,12 @@ export default function LoginPage() {
             return;
         }
 
-        // 🔹 Step 3: Cek apakah profil sudah lengkap
+        // Step 3: Check if the profile is complete
         if (!profile || Number(profile.current_weight_kg) === 0) {
-            // user baru → belum setup profil
+            // New user -> profile setup not yet complete
             router.push("/setup-profile");
         } else {
-            // user lama → langsung ke dashboard
+            // Existing user -> redirect to dashboard
             router.push("/dashboard");
         }
 
