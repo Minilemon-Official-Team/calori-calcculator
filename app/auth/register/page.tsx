@@ -3,145 +3,140 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { useRouter } from "next/navigation";
-import {
-    Card,
-    CardHeader,
-    CardTitle,
-    CardDescription,
-    CardContent,
-    CardFooter,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { User, Mail, Lock } from "lucide-react";
+import { Logo } from "@/components/ui/logo";
 
 export default function RegisterPage() {
-    const [fullname, setFullname] = useState("");
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [confirm, setConfirm] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
+  const [fullname, setFullname] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-    const router = useRouter();
+  const router = useRouter();
 
-    const handleRegister = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (password !== confirm) return setError("Password tidak sama");
-        if (password.length < 6)
-            return setError("Password minimal 6 karakter");
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password !== confirm) return setError("Password tidak sama");
+    if (password.length < 6) return setError("Password minimal 6 karakter");
 
-        setLoading(true);
-        setError("");
+    setLoading(true);
+    setError("");
 
-        // Sign up with Supabase Auth
-        const { data, error } = await supabase.auth.signUp({
-            email: email.trim().toLowerCase(),
-            password: password.trim(),
-            options: {
-                data: { full_name: fullname },
-            },
-        });
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim().toLowerCase(),
+      password: password.trim(),
+      options: {
+        data: { full_name: fullname },
+      },
+    });
 
-        if (error) {
-            console.error("Supabase sign up error:", error);
-            setError(error.message);
-            setLoading(false);
-            return;
-        }
+    if (error) {
+      console.error("Supabase sign up error:", error);
+      setError(error.message);
+      setLoading(false);
+      return;
+    }
 
-        // If signup is successful and user is available
-        if (data.user) {
-            // Manually create a new row in the profiles table
-            const { error: profileError } = await supabase
-                .from("profiles")
-                .insert({
-                    id: data.user.id,
-                    username: `user_${data.user.id.slice(0, 8)}`,
-                    full_name: fullname,
-                    current_weight_kg: 0.0,
-                });
+    if (data.user) {
+      const { error: profileError } = await supabase.from("profiles").insert({
+        id: data.user.id,
+        username: `user_${data.user.id.slice(0, 8)}`,
+        full_name: fullname,
+        current_weight_kg: 0.0,
+      });
 
-            if (profileError) {
-                setError(profileError.message);
-                setLoading(false);
-                return;
-            }
-
-            // Redirect to the login page
-            router.push("/auth/login");
-        }
-
+      if (profileError) {
+        setError(profileError.message);
         setLoading(false);
-    };
+        return;
+      }
 
-    return (
-        <div className="min-h-screen grid grid-cols-1 md:grid-cols-2">
-            <div className="flex items-center justify-center p-6">
-                <Card className="max-w-md w-full">
-                    <CardHeader>
-                        <CardTitle>Buat Akun Baru</CardTitle>
-                        <CardDescription>
-                            Isi data di bawah ini untuk memulai perjalanan sehat
-                            Anda.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <form onSubmit={handleRegister} className="space-y-4">
-                            <Input
-                                type="text"
-                                placeholder="Nama Lengkap"
-                                value={fullname}
-                                onChange={(e) => setFullname(e.target.value)}
-                                required
-                            />
-                            <Input
-                                type="email"
-                                placeholder="email@anda.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                            />
-                            <Input
-                                type="password"
-                                placeholder="Password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                            />
-                            <Input
-                                type="password"
-                                placeholder="Konfirmasi Password"
-                                value={confirm}
-                                onChange={(e) => setConfirm(e.target.value)}
-                                required
-                            />
-                            {error && (
-                                <p className="text-red-500 text-sm">{error}</p>
-                            )}
-                        </form>
-                    </CardContent>
-                    <CardFooter className="flex flex-col gap-2">
-                        <Button
-                            onClick={handleRegister}
-                            disabled={loading}
-                            className="w-full"
-                        >
-                            {loading ? "Loading..." : "Register"}
-                        </Button>
-                        <p className="text-sm text-center">
-                            Sudah punya akun?{" "}
-                            <Link
-                                href="/auth/login"
-                                className="text-blue-500 underline"
-                            >
-                                Sign In
-                            </Link>
-                        </p>
-                    </CardFooter>
-                </Card>
-            </div>
-            <div className="hidden md:block bg-[url('/images/register-bg.jpg')] bg-cover bg-center" />
+      router.push("/auth/login");
+    }
+
+    setLoading(false);
+  };
+
+  return (
+    <div className="min-h-screen grid grid-cols-1 md:grid-cols-2">
+      <div className="flex flex-col justify-center items-center px-10">
+        <div className="flex justify-center mb-10">
+          <Logo size={80} />
         </div>
-    );
+
+        <form onSubmit={handleRegister} className="w-full max-w-sm space-y-5">
+          <div className="flex items-center border rounded-md px-3 py-2 gap-2">
+            <User className="w-5 h-5" />
+            <Input
+              type="text"
+              placeholder="Fullname"
+              className="border-none shadow-none focus:ring-0"
+              value={fullname}
+              onChange={(e) => setFullname(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="flex items-center border rounded-md px-3 py-2 gap-2">
+            <Mail className="w-5 h-5" />
+            <Input
+              type="email"
+              placeholder="Email Address"
+              className="border-none shadow-none focus:ring-0"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="flex items-center border rounded-md px-3 py-2 gap-2">
+            <Lock className="w-5 h-5" />
+            <Input
+              type="password"
+              placeholder="Password"
+              className="border-none shadow-none focus:ring-0"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="flex items-center border rounded-md px-3 py-2 gap-2">
+            <Lock className="w-5 h-5" />
+            <Input
+              type="password"
+              placeholder="Confirm Password"
+              className="border-none shadow-none focus:ring-0"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              required
+            />
+          </div>
+
+          {error && <p className="text-red-500 text-sm">{error}</p>}
+
+          <Button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-[#C2E66E] text-black font-semibold hover:bg-[#b8dc66]"
+          >
+            {loading ? "Loading..." : "Register"}
+          </Button>
+
+          <p className="text-sm text-center">
+            Sudah memiliki akun?{" "}
+            <Link href="/auth/login" className="text-[#C2E66E] font-semibold">
+              Login
+            </Link>
+          </p>
+        </form>
+      </div>
+      <div className="hidden md:block bg-[url('/images/auth-bg.jpg')] bg-cover bg-center" />
+    </div>
+  );
 }
