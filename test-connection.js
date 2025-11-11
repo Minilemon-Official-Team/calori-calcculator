@@ -1,14 +1,13 @@
 // // Explicitly load variables from the .env.local file
-
-
 async function testGoogleApiConnection() {
     // Get API Key from environment variable
     const apiKey = process.env.GEMINI_API_KEY;
-(!apiKey) {
+if (!apiKey) {
         console.error(
             "\x1b[31m%s\x1b[0m", // Red
             "ERROR: GEMINI_API_KEY tidak ditemukan di file .env.local"
         );
+        console.error(
             "Pastikan file .env.local ada di direktori yang sama dan berisi baris GEMINI_API_KEY=..."
         );
         return;
@@ -21,7 +20,8 @@ async function testGoogleApiConnection() {
         const response = await fetch(
             "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
             {
-          :     headers: {
+                method: "POST",
+                headers: {
                     "Content-Type": "application/json",
                     "X-goog-api-key": apiKey,
                 },
@@ -50,8 +50,7 @@ async function testGoogleApiConnection() {
             "\n❌ KESALAHAN KRITIS: Gagal melakukan fetch. Ini adalah masalah jaringan."
         );
         console.error("Detail:", error.message);
-        console.log(ntivirus, atau pengaturan Proxy/VPN Anda."
-        );
+        console.log("Periksa antivirus, atau pengaturan Proxy/VPN Anda.");
     }
 }
 
