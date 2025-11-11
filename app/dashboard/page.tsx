@@ -211,7 +211,6 @@ export default function DashboardPage() {
     setCurrentPage(page);
   };
 
-  // Show loading screen while checking session
   if (isSessionChecking) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#F9FAFB]">
