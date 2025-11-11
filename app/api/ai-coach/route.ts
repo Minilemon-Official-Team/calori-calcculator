@@ -3,48 +3,51 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
-  console.error("GEMINI_API_KEY tidak ditemukan di environment variable!");
+    throw new Error("GEMINI_API_KEY is not defined in environment variables.");
 }
 
-const genAI = new GoogleGenerativeAI(apiKey || "");
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+const genAI = new GoogleGenerativeAI(apiKey);
+const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash", // Use the model that has been proven to work
+});
 
 export async function POST(req: Request) {
-  try {
-    const { netCalories } = await req.json();
+    try {
+        const { netCalories } = await req.json();
 
-    if (typeof netCalories !== "number") {
-      return NextResponse.json(
-        { error: "Parameter netCalories harus berupa angka." },
-        { status: 400 }
-      );
-    }
+        if (typeof netCalories !== "number") {
+            return NextResponse.json(
+                {
+                    error: "Parameter 'netCalories' dibutuhkan dan harus berupa angka.",
+                },
+                { status: 400 }
+            );
+        }
 
-    const prompt = `
-      Kamu adalah pelatih kesehatan AI.
-      Berikan pesan motivasi singkat (maksimal 30 kata) berdasarkan hasil kalori bersih berikut:
-      Kalori bersih pengguna: ${netCalories} kkal.
-      Gunakan Bahasa Indonesia yang positif dan menyemangati.
+        const prompt = `
+      Berikan satu kalimat motivasi singkat (maksimal 20 kata) untuk seseorang yang sedang diet.
+      Kondisi kalori bersih hari ini: ${netCalories} kalori.
+      - Jika kalori bersih negatif (defisit), berikan pujian.
+      - Jika kalori bersih positif (surplus), berikan semangat untuk hari esok.
+      - Jika kalori bersih nol, berikan motivasi umum.
+      Gunakan Bahasa Indonesia yang positif dan menyemangati. Jangan gunakan format tebal (bold) atau markdown apa pun.
+      Pastikan kalimatnya relevan dengan kondisi kalori bersih yang diberikan. Sebutkan kalori bersih dalam kalimat motivasi.
+        Contoh Kalimat motivasi:
+        "Kalori bersih hari ini adalah ${netCalories} kalori. Tetap semangat, setiap langkah kecil membawa perubahan besar!", untuk mencapai tujuan dietmu! Berikut adalah saran yang bisa kamu gunakan. [Lakukan berikan saran sesuai kondisi kalori bersih yang diberikan dengan kalimat yang tidak kaku dan mengalir natural].
     `;
 
-    const result = await model.generateContent(prompt);
-    const message = result.response.text();
+        const result = await model.generateContent(prompt);
+        const message = result.response.text();
 
-    return NextResponse.json({ message });
-  } catch (error: unknown) {
-    console.error("Error saat memanggil Gemini API:", error);
-
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Terjadi kesalahan yang tidak diketahui.";
-
-    return NextResponse.json(
-      {
-        error: "Gagal memanggil Gemini API",
-        detail: message,
-      },
-      { status: 500 }
-    );
-  }
+        return NextResponse.json({ message });
+    } catch (error) {
+        console.error("Error saat memanggil Gemini API:", error);
+        return NextResponse.json(
+            {
+                error: "Gagal memanggil Gemini API",
+                detail: (error as Error).message,
+            },
+            { status: 500 }
+        );
+    }
 }
