@@ -15,10 +15,24 @@ import { Search, Timer, Dumbbell } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
-export default function LogActivityModal({ onClose }: { onClose: () => void }) {
-  const [activities, setActivities] = useState<any[]>([]);
+export default function LogActivityModal({
+  onClose,
+  onRefresh,
+}: {
+  onClose: () => void;
+  onRefresh?: () => void;
+}) {
+  type Activity = {
+    id: number;
+    activity_name: string;
+    met_value: number;
+  };
+
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [search, setSearch] = useState("");
-  const [selectedActivity, setSelectedActivity] = useState<any | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(
+    null
+  );
   const [duration, setDuration] = useState<number>(30);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -67,11 +81,34 @@ export default function LogActivityModal({ onClose }: { onClose: () => void }) {
 
       if (insertError) throw insertError;
 
+      try {
+        const { data: stats } = await supabase
+          .from("user_stats")
+          .select("total_coins")
+          .eq("user_id", user.id)
+          .single();
+
+        const total = stats?.total_coins;
+        if (typeof total === "number") {
+          window.dispatchEvent(
+            new CustomEvent("coins-updated", { detail: { total_coins: total } })
+          );
+        }
+      } catch (e) {
+        console.error("Failed to fetch user_stats after activity insert:", e);
+      }
+
       alert("✅ Aktivitas berhasil dicatat!");
+
+      if (onRefresh) {
+        onRefresh();
+      }
+
       onClose();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message);
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
     } finally {
       setSaving(false);
     }

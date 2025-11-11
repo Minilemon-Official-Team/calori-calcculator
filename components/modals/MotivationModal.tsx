@@ -28,14 +28,14 @@ export default function MotivationModal({
         </div>
 
         <DialogHeader>
-          <DialogTitle className="text-center text-base font-medium">
+          <DialogTitle className="text-center text-2xl font-semibold">
             Tips Motivasi
           </DialogTitle>
         </DialogHeader>
 
-        <div className="mt-4 bg-[#FCFFD9] border border-[#C2E66E] text-gray-800 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
-          <Lightbulb className="w-4 h-4 text-[#C2E66E]" />
-          <span>{message}</span>
+        <div className="mt-4 bg-[#FCFFD9] border border-[#C2E66E] text-gray-800 text-sm rounded-xl px-4 py-3 flex items-start gap-3">
+          <Lightbulb className="w-5 h-5 text-[#C2E66E] flex-shrink-0 mt-[2px]" />
+          <p className="text-sm leading-relaxed break-words">{message}</p>
         </div>
       </DialogContent>
     </Dialog>
