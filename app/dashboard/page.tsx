@@ -1,408 +1,468 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getMotivationMessage } from "@/lib/aiCoach";
 import LogFoodModal from "@/components/modals/LogFoodModal";
 import LogActivityModal from "@/components/modals/LogActivityModal";
-
+import MotivationModal from "@/components/modals/MotivationModal";
 import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { Calendar } from "@/components/ui/calendar";
 import {
-    Popover,
-    PopoverTrigger,
-    PopoverContent,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
 } from "@/components/ui/popover";
-import { CalendarDays } from "lucide-react";
-import dayjs from "dayjs";
-
 import {
-    LineChart,
-    Line,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    Legend,
-    ResponsiveContainer,
+  CalendarDays,
+  ForkKnife,
+  Flame,
+  Activity,
+  Lightbulb,
+  Dumbbell,
+} from "lucide-react";
+import dayjs from "dayjs";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
 } from "recharts";
 
 export default function DashboardPage() {
-    const [coins, setCoins] = useState(0);
-    const [date, setDate] = useState(new Date());
-    const [summary, setSummary] = useState({
-        total_calories_in: 0,
-        total_calories_out: 0,
-        net_calories: 0,
+  const [date, setDate] = useState(new Date());
+  const [summary, setSummary] = useState({
+    total_calories_in: 0,
+    total_calories_out: 0,
+    net_calories: 0,
+  });
+  type WeeklyDataEntry = {
+    log_date: string;
+    total_in: number;
+    total_out: number;
+    net_calories: number;
+  };
+
+  type LogEntry = {
+    id: string | number;
+    item: string;
+    detail?: string;
+    calories: number;
+  };
+
+  const [weeklyData, setWeeklyData] = useState<WeeklyDataEntry[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [motivation, setMotivation] = useState("");
+  const [motivationLoading, setMotivationLoading] = useState(false);
+  const [showFoodModal, setShowFoodModal] = useState(false);
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [showMotivationModal, setShowMotivationModal] = useState(false);
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const totalPages = Math.max(1, Math.ceil(logs.length / itemsPerPage));
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentLogs = logs.slice(indexOfFirstItem, indexOfLastItem);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [logs]);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: summaryData } = await supabase.rpc("get_daily_summary", {
+      p_user_id: user.id,
+      p_log_date: dayjs(date).format("YYYY-MM-DD"),
     });
-    const [weeklyData, setWeeklyData] = useState([]);
-    const [logs, setLogs] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [motivation, setMotivation] = useState("");
-    const [motivationLoading, setMotivationLoading] = useState(false);
-    const [achievements, setAchievements] = useState([]);
-    const [showFoodModal, setShowFoodModal] = useState(false);
-    const [showActivityModal, setShowActivityModal] = useState(false);
+    if (summaryData && summaryData.length > 0) {
+      setSummary(summaryData[0]);
+    }
 
-    useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            const {
-                data: { user },
-            } = await supabase.auth.getUser();
-            if (!user) return;
+    const { data: foodLogs } = await supabase
+      .from("food_logs")
+      .select("id, food_name, calories_kcal, log_date")
+      .eq("user_id", user.id)
+      .eq("log_date", dayjs(date).format("YYYY-MM-DD"));
 
-            const { data: summaryData } = await supabase.rpc(
-                "get_daily_summary",
-                {
-                    p_user_id: user.id,
-                    p_log_date: dayjs(date).format("YYYY-MM-DD"),
-                }
-            );
-            if (summaryData && summaryData.length > 0) {
-                setSummary(summaryData[0]);
-            }
+    const { data: activityLogs } = await supabase
+      .from("activity_logs")
+      .select(
+        "id, duration_minutes, calories_burned, log_date, met_activity_id"
+      )
+      .eq("user_id", user.id)
+      .eq("log_date", dayjs(date).format("YYYY-MM-DD"));
 
-            const { data: foodLogs } = await supabase
-                .from("food_logs")
-                .select("id, food_name, calories_kcal, log_date")
-                .eq("user_id", user.id)
-                .eq("log_date", dayjs(date).format("YYYY-MM-DD"));
+    const { data: weeklyData } = await supabase.rpc("get_weekly_summary", {
+      p_user_id: user.id,
+    });
+    setWeeklyData(weeklyData || []);
 
-            const { data: activityLogs } = await supabase
-                .from("activity_logs")
-                .select(
-                    "id, duration_minutes, calories_burned, log_date, met_activity_id"
-                )
-                .eq("user_id", user.id)
-                .eq("log_date", dayjs(date).format("YYYY-MM-DD"));
+    const merged = [
+      ...(foodLogs?.map((f) => ({
+        id: f.id,
+        item: f.food_name,
+        detail: "Makanan",
+        calories: f.calories_kcal,
+      })) ?? []),
+      ...(activityLogs?.map((a) => ({
+        id: a.id,
+        item: `Aktivitas #${a.met_activity_id}`,
+        detail: `Durasi ${a.duration_minutes} menit`,
+        calories: -a.calories_burned,
+      })) ?? []),
+    ];
 
-            const { data: stats } = await supabase
-                .from("user_stats")
-                .select("total_coins")
-                .eq("user_id", user.id)
-                .single();
+    setLogs(merged);
+    setLoading(false);
+  }, [date]);
 
-            if (stats) setCoins(stats.total_coins);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
-            const { data: weeklyData } = await supabase.rpc(
-                "get_weekly_summary",
-                {
-                    p_user_id: user.id,
-                }
-            );
-            setWeeklyData(weeklyData || []);
+  const fetchMotivation = async () => {
+    setMotivationLoading(true);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("User tidak ditemukan");
 
-            const motivation = await getMotivationMessage(
-                summaryData?.[0]?.net_calories ?? 0
-            );
-            setMotivation(motivation);
+      const { data: summaryData } = await supabase.rpc("get_daily_summary", {
+        p_user_id: user.id,
+        p_log_date: dayjs(date).format("YYYY-MM-DD"),
+      });
 
-            const { data: userAchievements } = await supabase
-                .from("user_achievements")
-                .select("*, achievements(name, description)")
-                .eq("user_id", user.id);
+      const netCalories = summaryData?.[0]?.net_calories ?? 0;
 
-            if (userAchievements) setAchievements(userAchievements);
+      const res = await fetch("/api/ai-coach", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ netCalories }),
+      });
 
-            const merged = [
-                ...(foodLogs?.map((f) => ({
-                    id: f.id,
-                    item: f.food_name,
-                    detail: "Makanan",
-                    calories: f.calories_kcal,
-                })) ?? []),
-                ...(activityLogs?.map((a) => ({
-                    id: a.id,
-                    item: `Aktivitas #${a.met_activity_id}`,
-                    detail: `Durasi ${a.duration_minutes} menit`,
-                    calories: -a.calories_burned,
-                })) ?? []),
-            ];
+      const data = await res.json();
 
-            setLogs(merged);
-            setLoading(false);
-        };
+      setMotivation(
+        data.message || "Terus semangat menjalani hari yang sehat! 💪"
+      );
+      setShowMotivationModal(true);
+    } catch (err: unknown) {
+      console.error(err);
+      const message =
+        err instanceof Error ? err.message : "Gagal mengambil motivasi AI.";
+      setMotivation(message);
+      setShowMotivationModal(true);
+    }
+    setMotivationLoading(false);
+  };
 
-        fetchData();
-    }, [date]);
+  const goToPage = (p: number) => {
+    const page = Math.min(Math.max(1, p), totalPages);
+    setCurrentPage(page);
+  };
 
-    const fetchMotivation = async () => {
-        setMotivationLoading(true);
-        try {
-            const {
-                data: { user },
-            } = await supabase.auth.getUser();
-            if (!user) throw new Error("User tidak ditemukan");
-
-            const { data: summaryData } = await supabase.rpc(
-                "get_daily_summary",
-                {
-                    p_user_id: user.id,
-                    p_log_date: dayjs(date).format("YYYY-MM-DD"),
-                }
-            );
-
-            const netCalories = summaryData?.[0]?.net_calories ?? 0;
-
-            const response = await fetch(
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" +
-                    process.env.NEXT_PUBLIC_GEMINI_API_KEY,
-                {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        contents: [
-                            {
-                                parts: [
-                                    {
-                                        text: `Berikan pesan motivasi pendek untuk pengguna fitness berdasarkan hasil hari ini. Kalori bersih: ${netCalories} kkal.`,
-                                    },
-                                ],
-                            },
-                        ],
-                    }),
-                }
-            );
-
-            const data = await response.json();
-            const message =
-                data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-                "Terus semangat menjalani hari yang sehat! 💪";
-            setMotivation(message);
-        } catch (error: any) {
-            console.error(error);
-            setMotivation("Gagal mengambil motivasi AI.");
-        }
-        setMotivationLoading(false);
-    };
-
-    return (
-        <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold">Dashboard</h1>
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Total Coins</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-2xl font-bold text-yellow-500">
-                            {coins} 🪙
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <Button
-                            variant="outline"
-                            className="flex items-center gap-2"
-                        >
-                            <CalendarDays className="w-4 h-4" />
-                            {dayjs(date).format("DD MMM YYYY")}
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent align="end" className="p-0">
-                        <Calendar
-                            mode="single"
-                            selected={date}
-                            onSelect={(d) => d && setDate(d)}
-                        />
-                    </PopoverContent>
-                </Popover>
-            </div>
-
-            {/* Calorie Summary: Displays intake, expenditure, and net calories for the day. */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Kalori Masuk</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-2xl font-bold">
-                            {summary.total_calories_in} kkal
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Kalori Terbakar</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-2xl font-bold text-green-600">
-                            {summary.total_calories_out} kkal
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Kalori Bersih</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-2xl font-bold text-blue-600">
-                            {summary.net_calories} kkal
-                        </p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Log Table: Displays food and activity logs for the selected day. */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Log Hari Ini</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {loading ? (
-                        <p>Loading...</p>
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Item</TableHead>
-                                    <TableHead>Detail</TableHead>
-                                    <TableHead>Kalori</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {logs.length > 0 ? (
-                                    logs.map((log) => (
-                                        <TableRow key={log.id}>
-                                            <TableCell>{log.item}</TableCell>
-                                            <TableCell>{log.detail}</TableCell>
-                                            <TableCell>
-                                                {log.calories} kkal
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell
-                                            colSpan={3}
-                                            className="text-center text-gray-500"
-                                        >
-                                            Belum ada data hari ini
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
-                    )}
-                </CardContent>
-            </Card>
-            <div className="flex justify-end gap-2 mb-4">
-                <Button onClick={() => setShowFoodModal(true)}>
-                    + Log Food
-                </Button>
-                <Button onClick={() => setShowActivityModal(true)}>
-                    + Log Activity
-                </Button>
-            </div>
-            {showFoodModal && (
-                <LogFoodModal onClose={() => setShowFoodModal(false)} />
-            )}
-
-            {showActivityModal && (
-                <LogActivityModal onClose={() => setShowActivityModal(false)} />
-            )}
-            <Card>
-                <CardHeader className="flex justify-between items-center">
-                    <CardTitle>AI Coach</CardTitle>
-                    <Button
-                        onClick={fetchMotivation}
-                        disabled={motivationLoading}
-                    >
-                        {motivationLoading
-                            ? "Memuat..."
-                            : "Dapatkan Motivasi AI"}
-                    </Button>
-                </CardHeader>
-                <CardContent>
-                    {motivation ? (
-                        <p className="text-lg italic">{motivation}</p>
-                    ) : (
-                        <p className="text-gray-500">
-                            Klik tombol di atas untuk motivasi harian 💬
-                        </p>
-                    )}
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Pencapaian Kamu</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {achievements.length === 0 ? (
-                        <p className="text-gray-500">Belum ada pencapaian 😅</p>
-                    ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                            {achievements.map((a: any) => (
-                                <div
-                                    key={a.id}
-                                    className="p-4 border rounded-xl shadow-sm bg-yellow-50"
-                                >
-                                    <p className="font-bold text-yellow-700">
-                                        🏅 {a.achievements.name}
-                                    </p>
-                                    <p className="text-sm text-gray-700">
-                                        {a.achievements.description}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader>
-                    <CardTitle>Tren Kalori Mingguan</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {weeklyData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height={300}>
-                            <LineChart data={weeklyData}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="log_date" />
-                                <YAxis />
-                                <Tooltip />
-                                <Legend />
-                                <Line
-                                    type="monotone"
-                                    dataKey="total_in"
-                                    stroke="#82ca9d"
-                                    name="Kalori Masuk"
-                                />
-                                <Line
-                                    type="monotone"
-                                    dataKey="total_out"
-                                    stroke="#8884d8"
-                                    name="Kalori Terbakar"
-                                />
-                                <Line
-                                    type="monotone"
-                                    dataKey="net_calories"
-                                    stroke="#ff7300"
-                                    name="Kalori Bersih"
-                                />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <p className="text-gray-500">
-                            Belum ada data minggu ini.
-                        </p>
-                    )}
-                </CardContent>
-            </Card>
+  return (
+    <div className="p-6 bg-[#F9FAFB] min-h-screen space-y-8">
+      <div className="flex flex-wrap justify-between gap-8">
+        <div className="flex items-center bg-white rounded-2xl shadow-lg px-8 py-6 w-full md:w-[360px]">
+          <div className="bg-[#FFA257] rounded-2xl w-16 h-16 flex items-center justify-center shadow-md">
+            <ForkKnife className="w-7 h-7" />
+          </div>
+          <div className="ml-5">
+            <p className="text-base text-gray-500 font-medium">Kalori Masuk</p>
+            <p className="text-2xl font-bold text-gray-900">
+              {summary.total_calories_in}
+              <span className="text-base font-normal text-gray-500 ml-1">
+                Kalori
+              </span>
+            </p>
+          </div>
         </div>
-    );
+
+        <div className="flex items-center bg-white rounded-2xl shadow-lg px-8 py-6 w-full md:w-[360px]">
+          <div className="bg-[#FF3B30] rounded-2xl w-16 h-16 flex items-center justify-center shadow-md">
+            <Flame className="w-7 h-7" />
+          </div>
+          <div className="ml-5">
+            <p className="text-base text-gray-500 font-medium">
+              Kalori Terbakar
+            </p>
+            <p className="text-2xl font-bold text-gray-900">
+              {summary.total_calories_out}
+              <span className="text-base font-normal text-gray-500 ml-1">
+                Kalori
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center bg-[#C2E66E] rounded-2xl shadow-lg px-8 py-6 w-full md:w-[360px]">
+          <div className="bg-[#D8F5A2] rounded-2xl w-16 h-16 flex items-center justify-center shadow-md">
+            <Activity className="w-7 h-7 text-[#6E882A]" />
+          </div>
+          <div className="ml-5 text-white">
+            <p className="text-base font-medium opacity-90">Kalori Bersih</p>
+            <p className="text-2xl font-bold">
+              {summary.net_calories.toLocaleString()}
+              <span className="text-base font-normal ml-1 opacity-90">
+                Kalori
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap justify-between items-center gap-4">
+        <div className="flex items-center gap-3">
+          <Activity className="w-6 h-6" />
+          <h2 className="text-2xl font-semibold text-gray-800">
+            Catatan Aktivitas
+          </h2>
+        </div>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className="flex items-center gap-2 text-gray-600"
+            >
+              <CalendarDays className="w-4 h-4" />
+              {dayjs(date).format("DD MMM YYYY")}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="p-0">
+            <Calendar
+              mode="single"
+              selected={date}
+              onSelect={(d) => d && setDate(d)}
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
+
+      <Card className="border-none shadow-sm rounded-2xl">
+        <div className="flex flex-wrap items-center justify-between p-4 gap-2">
+          <Button
+            onClick={fetchMotivation}
+            disabled={motivationLoading}
+            className="bg-[#FFA257] hover:bg-[#FF9b3a] text-black 
+                 px-3 py-2 sm:px-4 sm:py-2 rounded-xl flex items-center gap-2 text-sm sm:text-base"
+          >
+            <Lightbulb className="w-4 h-4 sm:w-5 sm:h-5" />
+            {motivationLoading ? "Mengambil..." : "DapatkanMotivasi"}
+          </Button>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => setShowActivityModal(true)}
+              className="bg-[#C2E66E] hover:bg-[#B7DD5A] text-[#2E4B00] 
+                   px-2 py-1 sm:px-3 sm:py-2 rounded-full flex items-center gap-2 text-xs sm:text-sm"
+            >
+              <Dumbbell className="w-3 h-3 sm:w-4 sm:h-4" />
+              Tambah Aktivitas
+            </Button>
+
+            <Button
+              onClick={() => setShowFoodModal(true)}
+              className="bg-[#C2E66E] hover:bg-[#B7DD5A] text-[#2E4B00] 
+                   px-2 py-1 sm:px-3 sm:py-2 rounded-full flex items-center gap-2 text-xs sm:text-sm"
+            >
+              <ForkKnife className="w-3 h-3 sm:w-4 sm:h-4" />
+              Tambah Makanan
+            </Button>
+          </div>
+        </div>
+
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-6 text-gray-500">Loading...</div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-white">
+                      <TableHead className="font-medium text-gray-500 text-left px-6 py-3">
+                        Item
+                      </TableHead>
+                      <TableHead className="font-medium text-gray-500 text-left px-6 py-3">
+                        Detail
+                      </TableHead>
+                      <TableHead className="font-medium text-gray-500 text-right px-6 py-3">
+                        Cals
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {currentLogs.length > 0 ? (
+                      currentLogs.map((log) => (
+                        <TableRow
+                          key={log.id}
+                          className="border-t hover:bg-gray-50"
+                        >
+                          <TableCell className="px-6 py-4 text-sm text-gray-800">
+                            {log.item}
+                          </TableCell>
+                          <TableCell className="px-6 py-4 text-sm text-gray-600">
+                            {log.detail}
+                          </TableCell>
+                          <TableCell
+                            className={`px-6 py-4 text-sm font-medium text-right ${
+                              log.calories > 0
+                                ? "text-[#FFA257]"
+                                : "text-[#F45C43]"
+                            }`}
+                          >
+                            {log.calories} kkal
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell
+                          colSpan={3}
+                          className="text-center text-gray-500 py-8"
+                        >
+                          Belum ada data hari ini
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {logs.length > itemsPerPage && (
+                <div className="flex items-center justify-start gap-2 px-4 py-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-100"
+                  >
+                    ‹
+                  </Button>
+
+                  {Array.from({ length: totalPages }, (_, i) => {
+                    const page = i + 1;
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => goToPage(page)}
+                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                          page === currentPage
+                            ? "bg-[#C2E66E] text-[#2E4B00]"
+                            : "bg-white text-gray-600 border border-gray-200"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="rounded-full w-8 h-8 flex items-center justify-center text-gray-500 hover:bg-gray-100"
+                  >
+                    ›
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-none shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold text-gray-800">
+            Weekly Progress
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {weeklyData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={320}>
+              <LineChart data={weeklyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis dataKey="log_date" tick={{ fill: "#6B7280" }} />
+                <YAxis tick={{ fill: "#6B7280" }} />
+                <Tooltip />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="total_in"
+                  stroke="#FFA257"
+                  strokeWidth={3}
+                  dot={false}
+                  name="Kalori Masuk"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="total_out"
+                  stroke="#F45C43"
+                  strokeWidth={3}
+                  dot={false}
+                  name="Kalori Terbakar"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="net_calories"
+                  stroke="#C2E66E"
+                  strokeWidth={3}
+                  dot={false}
+                  name="Kalori Bersih"
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-gray-500">Belum ada data minggu ini.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {showFoodModal && (
+        <LogFoodModal
+          onClose={() => setShowFoodModal(false)}
+          onRefresh={fetchData}
+        />
+      )}
+      {showActivityModal && (
+        <LogActivityModal
+          onClose={() => setShowActivityModal(false)}
+          onRefresh={fetchData}
+        />
+      )}
+
+      {showMotivationModal && (
+        <MotivationModal
+          isOpen={showMotivationModal}
+          onClose={() => setShowMotivationModal(false)}
+          message={motivation}
+        />
+      )}
+    </div>
+  );
 }
