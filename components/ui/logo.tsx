@@ -35,7 +35,7 @@ export function Logo({
           fontSize: `${size * 0.45}px`,
         }}
       >
-        Nutrigo
+        CalPal
       </span>
     </div>
   );

@@ -157,6 +157,7 @@ exception
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
 after insert on auth.users
 for each row execute function public.handle_new_user();
@@ -182,6 +183,7 @@ exception
 end;
 $$;
 
+drop trigger if exists on_profile_created on public.profiles;
 create trigger on_profile_created
 after insert on public.profiles
 for each row execute function public.handle_new_profile();
@@ -236,16 +238,31 @@ returns table(
 )
 language sql
 as $$
-  select
-    d::date as log_date,
-    coalesce(sum(f.calories_kcal), 0) as total_in,
-    coalesce(sum(a.calories_burned), 0) as total_out,
-    coalesce(sum(f.calories_kcal), 0) - coalesce(sum(a.calories_burned), 0) as net_calories
+with daily_series as (
+  select d::date as log_date
   from generate_series(current_date - interval '6 day', current_date, interval '1 day') as d
-  left join public.food_logs f on f.log_date = d and f.user_id = p_user_id
-  left join public.activity_logs a on a.log_date = d and a.user_id = p_user_id
-  group by d
-  order by d;
+),
+daily_food as (
+  select log_date, sum(calories_kcal) as total_in
+  from public.food_logs
+  where user_id = p_user_id
+  group by log_date
+),
+daily_activity as (
+  select log_date, sum(calories_burned) as total_out
+  from public.activity_logs
+  where user_id = p_user_id
+  group by log_date
+)
+select
+  ds.log_date,
+  coalesce(df.total_in, 0)::integer as total_in,
+  coalesce(da.total_out, 0)::integer as total_out,
+  (coalesce(df.total_in, 0) - coalesce(da.total_out, 0))::integer as net_calories
+from daily_series ds
+left join daily_food df on ds.log_date = df.log_date
+left join daily_activity da on ds.log_date = da.log_date
+order by ds.log_date;
 $$;
 
 -- =========================================
@@ -266,10 +283,12 @@ begin
 end;
 $$;
 
+drop trigger if exists food_log_reward on public.food_logs;
 create trigger food_log_reward
 after insert on public.food_logs
 for each row execute function public.add_coins_on_log();
 
+drop trigger if exists activity_log_reward on public.activity_logs;
 create trigger activity_log_reward
 after insert on public.activity_logs
 for each row execute function public.add_coins_on_log();
@@ -285,38 +304,10 @@ language plpgsql
 security definer
 set search_path = public
 as $$
-declare
-  log_streak int;
-  total_burned int;
 begin
-  select count(distinct log_date)
-  into log_streak
-  from public.food_logs
-  where user_id = p_user_id
-  and log_date >= current_date - interval '3 day';
-
-  select coalesce(sum(calories_burned), 0)
-  into total_burned
-  from public.activity_logs
-  where user_id = p_user_id;
-
-  if log_streak >= 3 then
-    insert into public.user_achievements (user_id, achievement_id)
-    values (p_user_id, 1)
-    on conflict do nothing;
-    update public.user_stats
-    set total_coins = total_coins + 20
-    where user_id = p_user_id;
-  end if;
-
-  if total_burned >= 1000 then
-    insert into public.user_achievements (user_id, achievement_id)
-    values (p_user_id, 2)
-    on conflict do nothing;
-    update public.user_stats
-    set total_coins = total_coins + 50
-    where user_id = p_user_id;
-  end if;
+  -- Achievement system disabled for now
+  -- Function body left empty to prevent errors
+  return;
 end;
 $$;
 
@@ -327,18 +318,27 @@ security definer
 set search_path = public
 as $$
 begin
-  perform public.check_user_achievements(new.user_id);
+  begin
+    perform public.check_user_achievements(new.user_id);
+  exception when others then
+    -- Log error but don't fail the insert
+    raise warning 'Achievement check failed for user %: %', new.user_id, sqlerrm;
+  end;
   return new;
 end;
 $$;
 
-create trigger food_log_check_achievements
-after insert on public.food_logs
-for each row execute function public.handle_log_for_achievement();
+-- Achievement triggers disabled to prevent foreign key errors
+-- The achievement system is currently not operational
+-- drop trigger if exists food_log_check_achievements on public.food_logs;
+-- create trigger food_log_check_achievements
+-- after insert on public.food_logs
+-- for each row execute function public.handle_log_for_achievement();
 
-create trigger activity_log_check_achievements
-after insert on public.activity_logs
-for each row execute function public.handle_log_for_achievement();
+-- drop trigger if exists activity_log_check_achievements on public.activity_logs;
+-- create trigger activity_log_check_achievements
+-- after insert on public.activity_logs
+-- for each row execute function public.handle_log_for_achievement();
 
 -- =========================================
 -- 1️⃣5️⃣ FUNCTION: calculate_activity_calories
@@ -417,22 +417,165 @@ $$;
 -- =========================================
 insert into public.met_activities (activity_name, met_value)
 values
-('Running, 5 mph', 8.3),
-('Cycling, 10 mph', 6.8),
-('Walking, brisk pace', 4.3),
+('Lari, 8 km/jam', 8.3),
+('Sepeda, 16 km/jam', 6.8),
+('Jalan cepat', 4.3),
 ('Yoga', 3.0),
-('Swimming', 7.0),
-('Strength training', 5.0),
-('House cleaning', 3.5)
+('Renang', 7.0),
+('Latihan kekuatan', 5.0),
+('Bersih-bersih rumah', 3.5),
+('Berkebun', 4.0),
+('Senam pagi', 4.5),
+('Futsal', 7.0),
+('Volleyball pantai', 6.0),
+('Bersepeda gunung', 7.5),
+('Bermain bola kaki', 7.0),
+('Berjalan kaki santai', 2.9),
+('Tari tradisional', 4.0),
+('Berenang gaya bebas', 7.5),
+('Lari maraton', 12.0),
+('Lempar lembing', 6.0),
+('Berkuda', 5.5),
+('Angkat beban', 6.0),
+('Berenang gaya dada', 6.5),
+('Tai chi', 3.5),
+('Mendaki gunung', 8.0),
+('Jogging santai', 5.0),
+('Berkemah', 3.0),
+('Bermain sepak takraw', 6.5),
+('Bermain tenis', 7.0),
+('Bersih-bersih halaman', 3.0),
+('Berenang gaya punggung', 6.0),
+('Lari interval', 9.0),
+('Bermain badminton', 6.0),
+('Basket', 7.5),
+('Golf (jalan kaki)', 4.3),
+('Panjat tebing', 8.5),
+('Ski air', 7.0),
+('Parkour', 10.0),
+('Bersepeda santai', 4.0),
+('Pijat relaksasi', 2.0),
+('Olahraga bela diri', 7.0),
+('Jogging cepat', 6.5),
+('Lari trail', 8.5),
+('Lompat tali', 10.0),
+('Hiking', 7.0),
+('Skateboard', 5.0),
+('Berenang gaya kupu-kupu', 9.0),
+('Wushu', 7.5),
+('Trekking', 7.5),
+('Ski salju', 8.0),
+('Mendayung kano', 5.5),
+('Ski lintas alam', 7.0),
+('Panahan', 4.0),
+('Aerobik', 6.0),
+('Berenang santai', 4.0),
+('Kebugaran kelas', 5.0),
+('Bodycombat', 6.5),
+('Bergulat', 8.0),
+('Lari cepat', 9.5),
+('Berenang dengan alat', 5.5),
+('Berjalan di pasir', 5.5),
+('Bermain frisbee', 4.0),
+('Kickboxing', 8.0),
+('Squash', 8.0),
+('Lempar cakram', 6.5),
+('Tai Chi', 3.5),
+('Berenang di kolam renang', 5.5),
+('Menari zumba', 6.5),
+('Bermain ping pong', 4.5),
+('Jalan kaki santai', 2.9),
+('Lari sprint', 12.0),
+('Berjalan di bukit', 5.5),
+('Naik sepeda listrik', 3.5),
+('Lari gunung', 9.0),
+('Bermain bola voli', 7.0),
+('Bermain skateboard', 5.0),
+('Jalan-jalan pagi', 3.5),
+('Berenang dengan gaya bebas', 6.0),
+('Menggendong anak', 3.5),
+('Jogging ringan', 5.0),
+('Panen padi', 4.0),
+('Lari di tempat', 7.0),
+('Ski air', 7.5),
+('Bermain sepak bola', 7.0),
+('Senam aerobik', 5.5),
+('Bersepeda kota', 4.5),
+('Mengangkat barang berat', 6.0),
+('Panjat tebing luar ruang', 8.5),
+('Mandi dengan cepat', 1.5),
+('Membawa barang berat', 3.0),
+('Bermain bola tangan', 6.0),
+('Latihan sepeda statis', 6.0),
+('Menggunakan alat kebugaran', 5.0),
+('Melakukan push-up', 8.0),
+('Gulat', 7.5),
+('Berjalan di mall', 3.0),
+('Lari cepat interval', 10.0),
+('Jalan kaki ringan', 3.0),
+('Memancing', 3.0),
+('Berkendara sepeda', 3.5),
+('Melompat', 7.0),
+('Berjalan naik tangga', 8.0),
+('Jalan di pantai', 3.5),
+('Menyapu halaman', 3.0),
+('Bermain bola basket', 6.5),
+('Bermain badminton', 6.0),
+('Berlari dengan anak', 4.5),
+('Cuci mobil', 3.0),
+('Kebugaran kelas high-intensity', 7.0),
+('Bermain tenis meja', 5.0),
+('Sepak bola pantai', 6.5),
+('Nge-gym', 5.5),
+('Sepeda dalam ruangan', 6.5),
+('Berjalan dengan kecepatan tinggi', 4.5),
+('Lari jarak jauh', 8.0),
+('Renang gaya dada', 6.5),
+('Berjalan cepat naik bukit', 6.5),
+('Mengajar yoga', 4.0),
+('Naik sepeda gunung', 7.0),
+('Bermain sepak bola pantai', 6.5),
+('Melakukan gerakan planking', 8.0),
+('Panjat tebing indoor', 7.5),
+('Berjalan dengan anjing', 3.0),
+('Mendayung', 4.5),
+('Main voli pantai', 6.5)
 on conflict (activity_name) do nothing;
 
+-- Hapus semua data pencapaian yang ada sebelumnya
+DELETE FROM public.achievements;
+
+-- Menambahkan pencapaian untuk koleksi koin saja
 insert into public.achievements (name, description)
 values
-('3-Day Streak', 'Log food for 3 consecutive days'),
-('1K Calories Burned', 'Burn a total of 1000 calories'),
-('Consistent Logger', 'Add activity logs every day for a week')
+  ('First Step', 'Diberikan saat kamu memulai langkah pertamamu di aplikasi.'),
+  ('Getting Started', 'Diberikan ketika kamu mencapai 500 koin.'),
+  ('On Track', 'Diberikan setelah mencapai 1000 koin.'),
+  ('Dedicated', 'Diberikan setelah mengumpulkan 1500 koin.'),
+  ('Superstar', 'Diberikan saat kamu mengumpulkan 2500 koin.'),
+  ('Champion', 'Diberikan ketika mencapai 10000 koin, pencapaian tertinggi.')
 on conflict do nothing;
+
+
+-- =========================================
+-- 1️⃣8️⃣ Translations: food search convert to english language
+-- =========================================
+-- Membuat tabel jika belum ada
+CREATE TABLE IF NOT EXISTS translations (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    source_text TEXT NOT NULL UNIQUE,
+    translated_text TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+
+-- Menambahkan indeks untuk pencarian yang lebih cepat
+CREATE INDEX IF NOT EXISTS idx_translations_source_text ON translations(source_text);
+
 
 -- =========================================
 -- ✅ END OF SETUP
 -- =========================================
+
+
+
