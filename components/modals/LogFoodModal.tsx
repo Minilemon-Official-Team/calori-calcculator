@@ -15,10 +15,22 @@ import { Search, Utensils } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
-export default function LogFoodModal({ onClose }: { onClose: () => void }) {
+export default function LogFoodModal({
+  onClose,
+  onRefresh,
+}: {
+  onClose: () => void;
+  onRefresh?: () => void;
+}) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<any[]>([]);
-  const [selectedFood, setSelectedFood] = useState<any | null>(null);
+  type FoodResult = {
+    name: string;
+    calories: number;
+    unit?: string;
+  };
+
+  const [results, setResults] = useState<FoodResult[]>([]);
+  const [selectedFood, setSelectedFood] = useState<FoodResult | null>(null);
   const [quantity, setQuantity] = useState("1");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -39,7 +51,7 @@ export default function LogFoodModal({ onClose }: { onClose: () => void }) {
       if (!res.ok) throw new Error("Gagal mengambil data dari USDA API");
 
       const data = await res.json();
-      setResults(data);
+      setResults(data as FoodResult[]);
     } catch (err: unknown) {
       const message =
         err instanceof Error
@@ -88,7 +100,29 @@ export default function LogFoodModal({ onClose }: { onClose: () => void }) {
       if (insertError) throw insertError;
       if (rpcData) console.log("✅ log_food result:", rpcData);
 
+      try {
+        const { data: stats } = await supabase
+          .from("user_stats")
+          .select("total_coins")
+          .eq("user_id", user.id)
+          .single();
+
+        const total = stats?.total_coins;
+        if (typeof total === "number") {
+          window.dispatchEvent(
+            new CustomEvent("coins-updated", { detail: { total_coins: total } })
+          );
+        }
+      } catch (e) {
+        console.error("Failed to fetch user_stats after log_food:", e);
+      }
+
       alert("✅ Log makanan berhasil disimpan!");
+
+      if (onRefresh) {
+        onRefresh();
+      }
+
       onClose();
     } catch (err: unknown) {
       console.error(err);
